@@ -4,6 +4,7 @@ pdf2docx
 qrcode
 Pillow
 pypdf
+openpyxl
 PyMuPDF
 python-dotenv
 flask
