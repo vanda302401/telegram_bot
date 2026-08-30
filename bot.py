@@ -8,6 +8,7 @@ import img2pdf
 from pdf2docx import Converter
 import qrcode
 from pypdf import PdfReader, PdfWriter
+import fitz  # PyMuPDF សម្រាប់បង្កើត PDF Preview / Thumbnail
 
 # --- 1. Web Server សម្រាប់ Render ---
 web_app = Flask(__name__)
@@ -34,8 +35,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🛠 **មុខងារដែលមាន៖**\n"
         "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF**\n"
         "2. ផ្ញើ **File PDF** ➔ បំប្លែងទៅ **Word (.docx)**\n"
-        "3. ផ្ញើ **File PDF** រួចវាយ `/compress` ➔ កាត់បន្ថយទំហំ **PDF** ឱ្យតូចជាងមុន\n"
-        "4. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត **QR Code**\n"
+        "3. ផ្ញើ **File PDF** រួច Reply វាយ `/preview` ➔ បង្កើត **Preview Image (Thumbnail)** នៃទំព័រទី១\n"
+        "4. ផ្ញើ **File PDF** រួច Reply វាយ `/compress` ➔ កាត់បន្ថយទំហំ **PDF**\n"
+        "5. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត **QR Code**\n"
     )
     await update.message.reply_text(msg)
 
@@ -82,11 +84,46 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
-# មុខងារ 3: Compress PDF (កាត់បន្ថយទំហំ PDF)
+# មុខងារ 3: PDF Preview / Thumbnail Generation (ទាញយករូបភាពទំព័រទី១)
+async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    reply = update.message.reply_to_message
+    if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
+        await update.message.reply_text("⚠️ សូម Reply ទៅកាន់ File PDF រួចវាយបញ្ជា `/preview`!")
+        return
+
+    status_msg = await update.message.reply_text("⏳ កំពុងបង្កើត Preview Image...")
+    pdf_file = await reply.document.get_file()
+    input_pdf = f"preview_in_{update.message.from_user.id}.pdf"
+    output_img = f"preview_out_{update.message.from_user.id}.png"
+
+    await pdf_file.download_to_drive(input_pdf)
+    try:
+        # បើក PDF ជាមួយ PyMuPDF
+        doc = fitz.open(input_pdf)
+        if len(doc) > 0:
+            page = doc[0]  # ទាញយកទំព័រទី ១ (Index 0)
+            pix = page.get_pixmap(dpi=150)  # Render ជារូបភាព HD
+            pix.save(output_img)
+            doc.close()
+
+            await update.message.reply_photo(
+                photo=open(output_img, "rb"),
+                caption=f"🖼 **PDF Preview (ទំព័រទី ១)**\n📄 សរុបមាន៖ {len(doc)} ទំព័រ"
+            )
+        else:
+            await update.message.reply_text("❌ File PDF នេះគ្មានទំព័រឡើយ!")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+    finally:
+        await status_msg.delete()
+        if os.path.exists(input_pdf): os.remove(input_pdf)
+        if os.path.exists(output_img): os.remove(output_img)
+
+# មុខងារ 4: Compress PDF
 async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
-        await update.message.reply_text("⚠️ សូម Reply ទៅកាន់ File PDF ដែលអ្នកចង់ Compress រួចវាយคำបញ្ชา `/compress`!")
+        await update.message.reply_text("⚠️ សូម Reply ទៅកាន់ File PDF រួចវាយបញ្ជា `/compress`!")
         return
 
     status_msg = await update.message.reply_text("⏳ កំពុងកាត់បន្ថយទំហំ PDF...")
@@ -113,7 +150,7 @@ async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_pdf): os.remove(output_pdf)
 
-# មុខងារ 4: Generate QR Code
+# មុខងារ 5: Generate QR Code
 async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = " ".join(context.args)
     if not text:
@@ -139,6 +176,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("qr", generate_qr))
+    app.add_handler(CommandHandler("preview", preview_pdf))
     app.add_handler(CommandHandler("compress", compress_pdf_file))
     app.add_handler(MessageHandler(filters.PHOTO, convert_image_to_pdf))
     app.add_handler(MessageHandler(filters.Document.PDF, convert_pdf_to_word))
