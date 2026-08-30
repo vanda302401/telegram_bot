@@ -4,6 +4,7 @@ pdf2docx
 qrcode
 Pillow
 pypdf
+aspose-cells
 openpyxl
 PyMuPDF
 python-dotenv
