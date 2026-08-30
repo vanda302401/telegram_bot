@@ -1,0 +1,5 @@
+python-telegram-bot
+img2pdf
+pdf2docx
+python-dotenv
+flask
