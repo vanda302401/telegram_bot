@@ -6,4 +6,4 @@ qrcode
 pypdf
 PyMuPDF
 Pillow
-aspose-cells
+aspose-cells-python
