@@ -30,22 +30,26 @@ logging.basicConfig(
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# Function សម្រាប់បង្កើត PDF Thumbnail ឱ្យ Telegram ទទួលស្គាល់
+# Function បង្កើត PDF Thumbnail ច្បាស់ HD (300 DPI + LANCZOS)
 def generate_pdf_thumbnail(pdf_path, output_thumb_path):
     try:
         doc = fitz.open(pdf_path)
         if len(doc) > 0:
             page = doc[0] # យកទំព័រទី១
-            pix = page.get_pixmap(dpi=72)
+            
+            # 1. កំណត់ DPI = 300 ឱ្យរូប Render មកច្បាស់ HD
+            zoom = 300 / 72
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
             
             temp_png = f"{output_thumb_path}.png"
             pix.save(temp_png)
             doc.close()
 
-            # Convert ទៅជា JPG + Resize ឱ្យសមស្របតាម Standard Telegram (<= 320px)
+            # 2. Resize ដោយប្រើ LANCZOS (រក្សាភាពច្បាស់ និងមិនបែក)
             img = Image.open(temp_png)
-            img.thumbnail((320, 320))
-            img.convert("RGB").save(output_thumb_path, "JPEG")
+            img.thumbnail((320, 320), Image.Resampling.LANCZOS)
+            img.convert("RGB").save(output_thumb_path, "JPEG", quality=100, optimize=True)
 
             if os.path.exists(temp_png):
                 os.remove(temp_png)
@@ -58,7 +62,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
         "សូមស្វាគមន៍មកកាន់ Ultimate File & Utility Bot! 🤖📄\n\n"
         "🛠 **មុខងារដែលមាន៖**\n"
-        "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF** (ភ្ជាប់ Thumbnail Preview លើ File PDF)\n"
+        "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF** (ភ្ជាប់ Thumbnail Preview ច្បាស់ HD)\n"
         "2. ផ្ញើ **File PDF** ➔ បំប្លែងទៅ **Word (.docx)**\n"
         "3. ផ្ញើ **File PDF** រួច Reply វាយ `/preview` ➔ ផ្ញើរូបភាព Full Preview នៃទំព័រទី១\n"
         "4. ផ្ញើ **File PDF** រួច Reply វាយ `/compress` ➔ កាត់បន្ថយទំហំ **PDF** (ភ្ជាប់ Thumbnail Preview)\n"
@@ -82,7 +86,7 @@ async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
         with open(output_pdf, "wb") as f:
             f.write(img2pdf.convert(input_img))
         
-        # 2. បង្កើត Thumbnail សម្រាប់ File PDF
+        # 2. បង្កើត Thumbnail សម្រាប់ File PDF (HD Quality)
         has_thumb = generate_pdf_thumbnail(output_pdf, thumb_path)
         
         # 3. ផ្ញើ File PDF ទៅកាន់ Telegram ដោយ attach ជាមួយ Thumbnail
@@ -139,7 +143,7 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
-# មុខងារ 3: Preview PDF Full Image
+# មុខងារ 3: Preview PDF Full Image (HD Quality)
 async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
@@ -157,7 +161,10 @@ async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pdf_doc = fitz.open(input_pdf)
         if len(pdf_doc) > 0:
             page = pdf_doc[0]
-            pix = page.get_pixmap(dpi=150)
+            # Matrix DPI 300 សម្រាប់ Preview ធំច្បាស់
+            zoom = 300 / 72
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
             pix.save(output_img)
             total_pages = len(pdf_doc)
             pdf_doc.close()
@@ -174,7 +181,7 @@ async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_img): os.remove(output_img)
 
-# មុខងារ 4: Compress PDF (ជាមួយ Thumbnail Preview)
+# មុខងារ 4: Compress PDF (ជាមួយ Thumbnail Preview HD)
 async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
