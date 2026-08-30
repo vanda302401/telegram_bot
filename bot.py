@@ -6,8 +6,9 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import img2pdf
 from pdf2docx import Converter
+import qrcode
 
-# --- 1. បង្កើត Web Server តូចមួយសម្រាប់ Render (Port Binding) ---
+# --- 1. Web Server សម្រាប់ Render ---
 web_app = Flask(__name__)
 
 @web_app.route('/')
@@ -27,8 +28,16 @@ logging.basicConfig(
 TOKEN = os.getenv("BOT_TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("សូមស្វាគមន៍មកកាន់ File Converter Bot! 🤖📄\nផ្ញើរូបភាពដើម្បីបំប្លែងទៅ PDF ឬផ្ញើ PDF ដើម្បីបំប្លែងទៅ Word។")
+    msg = (
+        "សូមស្វាគមន៍មកកាន់ Ultimate File & Utility Bot! 🤖📄\n\n"
+        "🛠 **មុខងារដែលមាន៖**\n"
+        "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF**\n"
+        "2. ផ្ញើ **File PDF** ➔ បំប្លែងទៅ **Word (.docx)**\n"
+        "3. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត **QR Code**\n"
+    )
+    await update.message.reply_text(msg)
 
+# មុខងារ 1: Image to PDF
 async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែងរូបភាពទៅជា PDF...")
     photo_file = await update.message.photo[-1].get_file()
@@ -39,7 +48,7 @@ async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         with open(output_pdf, "wb") as f:
             f.write(img2pdf.convert(input_img))
-        await update.message.reply_document(document=open(output_pdf, "rb"), caption="✅ បំប្លែងជោគជ័យ!")
+        await update.message.reply_document(document=open(output_pdf, "rb"), caption="✅ បំប្លែងទៅជា PDF ជោគជ័យ!")
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
     finally:
@@ -47,6 +56,7 @@ async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
         if os.path.exists(input_img): os.remove(input_img)
         if os.path.exists(output_pdf): os.remove(output_pdf)
 
+# មុខងារ 2: PDF to Word
 async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     if not doc.file_name.endswith('.pdf'):
@@ -62,7 +72,7 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         cv = Converter(input_pdf)
         cv.convert(output_docx, start=0, end=None)
         cv.close()
-        await update.message.reply_document(document=open(output_docx, "rb"), caption="✅ បំប្លែងជោគជ័យ!")
+        await update.message.reply_document(document=open(output_docx, "rb"), caption="✅ បំប្លែងទៅជា Word ជោគជ័យ!")
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
     finally:
@@ -70,13 +80,32 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
+# មុខងារ 3: Generate QR Code
+async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = " ".join(context.args)
+    if not text:
+        await update.message.reply_text("⚠️ សូមបញ្ជាក់ Link ឬ អត្ថបទ! ឧទាហរណ៍៖ `/qr https://google.com`")
+        return
+    
+    status_msg = await update.message.reply_text("⏳ កំពុងបង្កើត QR Code...")
+    qr_img = f"qr_{update.message.from_user.id}.png"
+    
+    try:
+        img = qrcode.make(text)
+        img.save(qr_img)
+        await update.message.reply_photo(photo=open(qr_img, "rb"), caption=f"✅ QR Code សម្រាប់៖ {text}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+    finally:
+        await status_msg.delete()
+        if os.path.exists(qr_img): os.remove(qr_img)
+
 def main():
-    # រត់ Web Server លើ Thread ផ្សេង
     Thread(target=run_web).start()
 
-    # រត់ Telegram Bot
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("qr", generate_qr))
     app.add_handler(MessageHandler(filters.PHOTO, convert_image_to_pdf))
     app.add_handler(MessageHandler(filters.Document.PDF, convert_pdf_to_word))
 
