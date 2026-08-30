@@ -7,6 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import img2pdf
 from pdf2docx import Converter
 import qrcode
+from pypdf import PdfReader, PdfWriter
 
 # --- 1. Web Server សម្រាប់ Render ---
 web_app = Flask(__name__)
@@ -33,7 +34,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🛠 **មុខងារដែលមាន៖**\n"
         "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF**\n"
         "2. ផ្ញើ **File PDF** ➔ បំប្លែងទៅ **Word (.docx)**\n"
-        "3. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត **QR Code**\n"
+        "3. ផ្ញើ **File PDF** រួចវាយ `/compress` ➔ កាត់បន្ថយទំហំ **PDF** ឱ្យតូចជាងមុន\n"
+        "4. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត **QR Code**\n"
     )
     await update.message.reply_text(msg)
 
@@ -80,7 +82,38 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
-# មុខងារ 3: Generate QR Code
+# មុខងារ 3: Compress PDF (កាត់បន្ថយទំហំ PDF)
+async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    reply = update.message.reply_to_message
+    if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
+        await update.message.reply_text("⚠️ សូម Reply ទៅកាន់ File PDF ដែលអ្នកចង់ Compress រួចវាយคำបញ្ชา `/compress`!")
+        return
+
+    status_msg = await update.message.reply_text("⏳ កំពុងកាត់បន្ថយទំហំ PDF...")
+    pdf_file = await reply.document.get_file()
+    input_pdf = f"compress_in_{update.message.from_user.id}.pdf"
+    output_pdf = f"compressed_out_{update.message.from_user.id}.pdf"
+
+    await pdf_file.download_to_drive(input_pdf)
+    try:
+        reader = PdfReader(input_pdf)
+        writer = PdfWriter()
+        for page in reader.pages:
+            page.compress_content_streams()
+            writer.add_page(page)
+        
+        with open(output_pdf, "wb") as f:
+            writer.write(f)
+
+        await update.message.reply_document(document=open(output_pdf, "rb"), caption="✅ កាត់បន្ថយទំហំ PDF ជោគជ័យ!")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+    finally:
+        await status_msg.delete()
+        if os.path.exists(input_pdf): os.remove(input_pdf)
+        if os.path.exists(output_pdf): os.remove(output_pdf)
+
+# មុខងារ 4: Generate QR Code
 async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = " ".join(context.args)
     if not text:
@@ -106,6 +139,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("qr", generate_qr))
+    app.add_handler(CommandHandler("compress", compress_pdf_file))
     app.add_handler(MessageHandler(filters.PHOTO, convert_image_to_pdf))
     app.add_handler(MessageHandler(filters.Document.PDF, convert_pdf_to_word))
 
