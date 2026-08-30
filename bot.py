@@ -30,26 +30,28 @@ logging.basicConfig(
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# Function បង្កើត PDF Thumbnail ច្បាស់ HD (300 DPI + LANCZOS)
+# Function បង្កើត PDF Thumbnail គុណភាព Ultra HD (400 DPI, Max 1280px, Subsampling 0)
 def generate_pdf_thumbnail(pdf_path, output_thumb_path):
     try:
         doc = fitz.open(pdf_path)
         if len(doc) > 0:
             page = doc[0] # យកទំព័រទី១
             
-            # 1. កំណត់ DPI = 300 ឱ្យរូប Render មកច្បាស់ HD
-            zoom = 300 / 72
+            # 1. កំណត់ DPI = 400 (Ultra HD Rendering)
+            zoom = 400 / 72
             mat = fitz.Matrix(zoom, zoom)
             pix = page.get_pixmap(matrix=mat, alpha=False)
             
-            temp_png = f"{output_thumb_path}.png"
+            temp_png = f"{output_thumb_path}_temp.png"
             pix.save(temp_png)
             doc.close()
 
-            # 2. Resize ដោយប្រើ LANCZOS (រក្សាភាពច្បាស់ និងមិនបែក)
+            # 2. Resize ទៅទំហំធំ HD (1280px) ដោយប្រើ LANCZOS
             img = Image.open(temp_png)
-            img.thumbnail((320, 320), Image.Resampling.LANCZOS)
-            img.convert("RGB").save(output_thumb_path, "JPEG", quality=100, optimize=True)
+            img.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
+            
+            # 3. Save ជា JPEG Quality 100 និងមិនឲ្យបាត់បង់ Chroma/Details (subsampling=0)
+            img.convert("RGB").save(output_thumb_path, "JPEG", quality=100, optimize=True, subsampling=0)
 
             if os.path.exists(temp_png):
                 os.remove(temp_png)
@@ -161,8 +163,8 @@ async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pdf_doc = fitz.open(input_pdf)
         if len(pdf_doc) > 0:
             page = pdf_doc[0]
-            # Matrix DPI 300 សម្រាប់ Preview ធំច្បាស់
-            zoom = 300 / 72
+            # Matrix DPI 400 សម្រាប់ Preview ធំច្បាស់
+            zoom = 400 / 72
             mat = fitz.Matrix(zoom, zoom)
             pix = page.get_pixmap(matrix=mat, alpha=False)
             pix.save(output_img)
