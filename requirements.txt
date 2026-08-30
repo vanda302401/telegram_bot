@@ -1,11 +1,9 @@
 python-telegram-bot
+flask
 img2pdf
 pdf2docx
 qrcode
-Pillow
 pypdf
-aspose-cells
-openpyxl
 PyMuPDF
-python-dotenv
-flask
+Pillow
+aspose-cells
