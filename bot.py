@@ -1,5 +1,6 @@
 import os
 import logging
+import subprocess
 from threading import Thread
 from flask import Flask
 from telegram import Update
@@ -30,14 +31,12 @@ logging.basicConfig(
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# Function បង្កើត PDF Thumbnail គុណភាព Ultra HD (400 DPI, Max 1280px, Subsampling 0)
+# Function បង្កើត PDF Thumbnail គុណភាព Ultra HD
 def generate_pdf_thumbnail(pdf_path, output_thumb_path):
     try:
         doc = fitz.open(pdf_path)
         if len(doc) > 0:
-            page = doc[0] # យកទំព័រទី១
-            
-            # 1. កំណត់ DPI = 400 (Ultra HD Rendering)
+            page = doc[0]
             zoom = 400 / 72
             mat = fitz.Matrix(zoom, zoom)
             pix = page.get_pixmap(matrix=mat, alpha=False)
@@ -46,11 +45,8 @@ def generate_pdf_thumbnail(pdf_path, output_thumb_path):
             pix.save(temp_png)
             doc.close()
 
-            # 2. Resize ទៅទំហំធំ HD (1280px) ដោយប្រើ LANCZOS
             img = Image.open(temp_png)
             img.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
-            
-            # 3. Save ជា JPEG Quality 100 និងមិនឲ្យបាត់បង់ Chroma/Details (subsampling=0)
             img.convert("RGB").save(output_thumb_path, "JPEG", quality=100, optimize=True, subsampling=0)
 
             if os.path.exists(temp_png):
@@ -64,15 +60,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
         "សូមស្វាគមន៍មកកាន់ Ultimate File & Utility Bot! 🤖📄\n\n"
         "🛠 **មុខងារដែលមាន៖**\n"
-        "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF** (ភ្ជាប់ Thumbnail Preview ច្បាស់ HD)\n"
+        "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF**\n"
         "2. ផ្ញើ **File PDF** ➔ បំប្លែងទៅ **Word (.docx)**\n"
-        "3. ផ្ញើ **File PDF** រួច Reply វាយ `/preview` ➔ ផ្ញើរូបភាព Full Preview នៃទំព័រទី១\n"
-        "4. ផ្ញើ **File PDF** រួច Reply វាយ `/compress` ➔ កាត់បន្ថយទំហំ **PDF** (ភ្ជាប់ Thumbnail Preview)\n"
-        "5. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត **QR Code**\n"
+        "3. ផ្ញើ **File Excel (.xlsx / .xls)** ➔ បំប្លែងទៅ **PDF** (ភ្ជាប់ Thumbnail)\n"
+        "4. ផ្ញើ **File PDF** រួច Reply វាយ `/preview` ➔ ផ្ញើរូបភាព Full Preview\n"
+        "5. ផ្ញើ **File PDF** រួច Reply វាយ `/compress` ➔ កាត់បន្ថយទំហំ PDF\n"
+        "6. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត QR Code\n"
     )
     await update.message.reply_text(msg)
 
-# មុខងារ 1: Image to PDF (បង្កើត PDF + Thumbnail Preview)
+# មុខងារ 1: Image to PDF
 async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែងរូបភាពទៅជា PDF...")
     photo_file = await update.message.photo[-1].get_file()
@@ -84,14 +81,11 @@ async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
     
     await photo_file.download_to_drive(input_img)
     try:
-        # 1. បំប្លែងរូបភាពទៅជា PDF
         with open(output_pdf, "wb") as f:
             f.write(img2pdf.convert(input_img))
         
-        # 2. បង្កើត Thumbnail សម្រាប់ File PDF (HD Quality)
         has_thumb = generate_pdf_thumbnail(output_pdf, thumb_path)
         
-        # 3. ផ្ញើ File PDF ទៅកាន់ Telegram ដោយ attach ជាមួយ Thumbnail
         if has_thumb and os.path.exists(thumb_path):
             with open(output_pdf, "rb") as pdf_file, open(thumb_path, "rb") as thumb_file:
                 await update.message.reply_document(
@@ -116,10 +110,6 @@ async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
 # មុខងារ 2: PDF to Word
 async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
-    if not doc.file_name.endswith('.pdf'):
-        await update.message.reply_text("⚠️ សូមផ្ញើតែ File PDF ប៉ុណ្ណោះ!")
-        return
-        
     status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែង PDF ទៅជា Word...")
     pdf_file = await doc.get_file()
     
@@ -145,7 +135,54 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
-# មុខងារ 3: Preview PDF Full Image (HD Quality)
+# មុខងារថ្មី: Excel to PDF (ប្រើ LibreOffice CLI)
+async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    doc = update.message.document
+    if not (doc.file_name.endswith('.xlsx') or doc.file_name.endswith('.xls')):
+        await update.message.reply_text("⚠️ សូមផ្ញើតែ File Excel (.xlsx ឬ .xls) ប៉ុណ្ណោះ!")
+        return
+
+    status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែង Excel ទៅជា PDF...")
+    excel_file = await doc.get_file()
+    
+    user_id = update.message.from_user.id
+    input_excel = f"excel_{user_id}_{doc.file_name}"
+    output_pdf = input_excel.rsplit('.', 1)[0] + ".pdf"
+    thumb_path = f"excel_thumb_{user_id}.jpg"
+
+    await excel_file.download_to_drive(input_excel)
+    try:
+        # បំប្លែង Excel ទៅជា PDF ដោយប្រើ LibreOffice Command Line
+        cmd = f"libreoffice --headless --convert-to pdf --outdir . '{input_excel}'"
+        subprocess.run(cmd, shell=True, check=True)
+
+        if os.path.exists(output_pdf):
+            has_thumb = generate_pdf_thumbnail(output_pdf, thumb_path)
+            if has_thumb and os.path.exists(thumb_path):
+                with open(output_pdf, "rb") as pdf_file, open(thumb_path, "rb") as thumb_file:
+                    await update.message.reply_document(
+                        document=pdf_file,
+                        thumbnail=thumb_file,
+                        caption="✅ បំប្លែង Excel ទៅជា PDF ជោគជ័យ!"
+                    )
+            else:
+                with open(output_pdf, "rb") as pdf_file:
+                    await update.message.reply_document(
+                        document=pdf_file,
+                        caption="✅ បំប្លែង Excel ទៅជា PDF ជោគជ័យ!"
+                    )
+        else:
+            await update.message.reply_text("❌ បរាជ័យក្នុងការបំប្លែង File!")
+
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)}\n\n(សូមប្រាកដថា Server មានដំឡើង LibreOffice)")
+    finally:
+        await status_msg.delete()
+        if os.path.exists(input_excel): os.remove(input_excel)
+        if os.path.exists(output_pdf): os.remove(output_pdf)
+        if os.path.exists(thumb_path): os.remove(thumb_path)
+
+# មុខងារ 4: Preview PDF
 async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
@@ -163,7 +200,6 @@ async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pdf_doc = fitz.open(input_pdf)
         if len(pdf_doc) > 0:
             page = pdf_doc[0]
-            # Matrix DPI 400 សម្រាប់ Preview ធំច្បាស់
             zoom = 400 / 72
             mat = fitz.Matrix(zoom, zoom)
             pix = page.get_pixmap(matrix=mat, alpha=False)
@@ -183,7 +219,7 @@ async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_img): os.remove(output_img)
 
-# មុខងារ 4: Compress PDF (ជាមួយ Thumbnail Preview HD)
+# មុខងារ 5: Compress PDF
 async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
@@ -231,7 +267,7 @@ async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(output_pdf): os.remove(output_pdf)
         if os.path.exists(thumb_path): os.remove(thumb_path)
 
-# មុខងារ 5: Generate QR Code
+# មុខងារ 6: Generate QR Code
 async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = " ".join(context.args)
     if not text:
@@ -261,7 +297,10 @@ def main():
     app.add_handler(CommandHandler("preview", preview_pdf))
     app.add_handler(CommandHandler("compress", compress_pdf_file))
     app.add_handler(MessageHandler(filters.PHOTO, convert_image_to_pdf))
+    
+    # ស្កែន Document File ( PDF ឬ Excel )
     app.add_handler(MessageHandler(filters.Document.PDF, convert_pdf_to_word))
+    app.add_handler(MessageHandler(filters.Document.FileExtension("xlsx") | filters.Document.FileExtension("xls"), convert_excel_to_pdf))
 
     print("🤖 Bot is starting...")
     app.run_polling()
