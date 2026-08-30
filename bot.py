@@ -1,6 +1,5 @@
 import os
 import logging
-import subprocess
 from threading import Thread
 from flask import Flask
 from telegram import Update
@@ -11,6 +10,7 @@ import qrcode
 from pypdf import PdfReader, PdfWriter
 import fitz  # PyMuPDF
 from PIL import Image
+import aspose.cells as cells
 
 # --- 1. Web Server សម្រាប់ Render ---
 web_app = Flask(__name__)
@@ -135,7 +135,7 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
-# មុខងារថ្មី: Excel to PDF (ប្រើ LibreOffice CLI)
+# មុខងារ 3: Excel to PDF (Pure Python Solution ដោយប្រើ Aspose.Cells)
 async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     if not (doc.file_name.endswith('.xlsx') or doc.file_name.endswith('.xls')):
@@ -147,14 +147,16 @@ async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
     
     user_id = update.message.from_user.id
     input_excel = f"excel_{user_id}_{doc.file_name}"
-    output_pdf = input_excel.rsplit('.', 1)[0] + ".pdf"
+    output_pdf = f"excel_out_{user_id}.pdf"
     thumb_path = f"excel_thumb_{user_id}.jpg"
 
     await excel_file.download_to_drive(input_excel)
     try:
-        # បំប្លែង Excel ទៅជា PDF ដោយប្រើ LibreOffice Command Line
-        cmd = f"libreoffice --headless --convert-to pdf --outdir . '{input_excel}'"
-        subprocess.run(cmd, shell=True, check=True)
+        # បំប្លែង Excel ទៅជា PDF
+        workbook = cells.Workbook(input_excel)
+        save_options = cells.PdfSaveOptions()
+        save_options.set_one_page_per_sheet(False)
+        workbook.save(output_pdf, save_options)
 
         if os.path.exists(output_pdf):
             has_thumb = generate_pdf_thumbnail(output_pdf, thumb_path)
@@ -175,7 +177,7 @@ async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text("❌ បរាជ័យក្នុងការបំប្លែង File!")
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {str(e)}\n\n(សូមប្រាកដថា Server មានដំឡើង LibreOffice)")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
     finally:
         await status_msg.delete()
         if os.path.exists(input_excel): os.remove(input_excel)
