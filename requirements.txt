@@ -1,8 +1,8 @@
 python-telegram-bot
 img2pdf
 pdf2docx
-docx2pdf
 qrcode
 Pillow
+pypdf
 python-dotenv
 flask
