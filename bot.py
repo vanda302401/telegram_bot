@@ -30,42 +30,43 @@ logging.basicConfig(
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = (
-        "សូមស្វាគមន៍មកកាន់ Ultimate File & Utility Bot! 🤖📄\n\n"
-        "🛠 **មុខងារដែលមាន៖**\n"
-        "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF** (ជាមួយ Thumbnail Preview)\n"
-        "2. ផ្ញើ **File PDF** ➔ បំប្លែងទៅ **Word (.docx)**\n"
-        "3. ផ្ញើ **File PDF** រួច Reply វាយ `/preview` ➔ បង្កើត **Preview Image ធំ**\n"
-        "4. ផ្ញើ **File PDF** រួច Reply វាយ `/compress` ➔ កាត់បន្ថយទំហំ **PDF**\n"
-        "5. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត **QR Code**\n"
-    )
-    await update.message.reply_text(msg)
-
-# មុខងារជំនួយ៖ បង្កើត Thumbnail សម្រាប់ Telegram Document (JPEG ទំហំ <= 320px)
-def make_telegram_thumbnail(pdf_path, thumb_path):
+# Function សម្រាប់បង្កើត PDF Thumbnail ឱ្យ Telegram ទទួលស្គាល់
+def generate_pdf_thumbnail(pdf_path, output_thumb_path):
     try:
         doc = fitz.open(pdf_path)
         if len(doc) > 0:
-            page = doc[0]
-            pix = page.get_pixmap(dpi=72) # ទាញយករូបទំព័រទី១
-            temp_png = f"{thumb_path}.png"
+            page = doc[0] # យកទំព័រទី១
+            pix = page.get_pixmap(dpi=72)
+            
+            temp_png = f"{output_thumb_path}.png"
             pix.save(temp_png)
             doc.close()
 
-            # Resize ឱ្យសមស្របតាម Standard Telegram (max 320x320) និង Save ជា JPEG
+            # Convert ទៅជា JPG + Resize ឱ្យសមស្របតាម Standard Telegram (<= 320px)
             img = Image.open(temp_png)
             img.thumbnail((320, 320))
-            img.convert("RGB").save(thumb_path, "JPEG")
-            
+            img.convert("RGB").save(output_thumb_path, "JPEG")
+
             if os.path.exists(temp_png):
                 os.remove(temp_png)
             return True
     except Exception as e:
-        print(f"Thumbnail error: {e}")
+        print(f"Thumbnail Generation Error: {e}")
     return False
 
-# មុខងារ 1: Image to PDF (ផ្ញើ PDF ត្រឡប់ទៅវិញដោយមាន Thumbnail Preview)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "សូមស្វាគមន៍មកកាន់ Ultimate File & Utility Bot! 🤖📄\n\n"
+        "🛠 **មុខងារដែលមាន៖**\n"
+        "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF** (ភ្ជាប់ Thumbnail Preview លើ File PDF)\n"
+        "2. ផ្ញើ **File PDF** ➔ បំប្លែងទៅ **Word (.docx)**\n"
+        "3. ផ្ញើ **File PDF** រួច Reply វាយ `/preview` ➔ ផ្ញើរូបភាព Full Preview នៃទំព័រទី១\n"
+        "4. ផ្ញើ **File PDF** រួច Reply វាយ `/compress` ➔ កាត់បន្ថយទំហំ **PDF** (ភ្ជាប់ Thumbnail Preview)\n"
+        "5. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត **QR Code**\n"
+    )
+    await update.message.reply_text(msg)
+
+# មុខងារ 1: Image to PDF (បង្កើត PDF + Thumbnail Preview)
 async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែងរូបភាពទៅជា PDF...")
     photo_file = await update.message.photo[-1].get_file()
@@ -73,36 +74,38 @@ async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.message.from_user.id
     input_img = f"temp_{user_id}.jpg"
     output_pdf = f"converted_{user_id}.pdf"
-    thumb_img = f"thumb_{user_id}.jpg"
+    thumb_path = f"thumb_{user_id}.jpg"
     
     await photo_file.download_to_drive(input_img)
     try:
+        # 1. បំប្លែងរូបភាពទៅជា PDF
         with open(output_pdf, "wb") as f:
             f.write(img2pdf.convert(input_img))
         
-        # បង្កើត Thumbnail Preview សម្រាប់ File PDF
-        has_thumb = make_telegram_thumbnail(output_pdf, thumb_img)
+        # 2. បង្កើត Thumbnail សម្រាប់ File PDF
+        has_thumb = generate_pdf_thumbnail(output_pdf, thumb_path)
         
-        if has_thumb and os.path.exists(thumb_img):
-            with open(thumb_img, "rb") as thumb_file:
+        # 3. ផ្ញើ File PDF ទៅកាន់ Telegram ដោយ attach ជាមួយ Thumbnail
+        if has_thumb and os.path.exists(thumb_path):
+            with open(output_pdf, "rb") as pdf_file, open(thumb_path, "rb") as thumb_file:
                 await update.message.reply_document(
-                    document=open(output_pdf, "rb"),
+                    document=pdf_file,
                     thumbnail=thumb_file,
                     caption="✅ បំប្លែងទៅជា PDF ជោគជ័យ!"
                 )
         else:
-            await update.message.reply_document(
-                document=open(output_pdf, "rb"),
-                caption="✅ បំប្លែងទៅជា PDF ជោគជ័យ!"
-            )
-            
+            with open(output_pdf, "rb") as pdf_file:
+                await update.message.reply_document(
+                    document=pdf_file,
+                    caption="✅ បំប្លែងទៅជា PDF ជោគជ័យ!"
+                )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
     finally:
         await status_msg.delete()
         if os.path.exists(input_img): os.remove(input_img)
         if os.path.exists(output_pdf): os.remove(output_pdf)
-        if os.path.exists(thumb_img): os.remove(thumb_img)
+        if os.path.exists(thumb_path): os.remove(thumb_path)
 
 # មុខងារ 2: PDF to Word
 async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -124,10 +127,11 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         cv.convert(output_docx, start=0, end=None)
         cv.close()
 
-        await update.message.reply_document(
-            document=open(output_docx, "rb"),
-            caption="✅ បំប្លែងទៅជា Word ជោគជ័យ!"
-        )
+        with open(output_docx, "rb") as docx_file:
+            await update.message.reply_document(
+                document=docx_file,
+                caption="✅ បំប្លែងទៅជា Word ជោគជ័យ!"
+            )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
     finally:
@@ -135,7 +139,7 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
-# មុខងារ 3: Preview PDF (ផ្ញើរូបភាព Full Size នៃទំព័រទី១)
+# មុខងារ 3: Preview PDF Full Image
 async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
@@ -158,10 +162,11 @@ async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total_pages = len(pdf_doc)
             pdf_doc.close()
 
-            await update.message.reply_photo(
-                photo=open(output_img, "rb"),
-                caption=f"🖼 **PDF Preview (ទំព័រទី ១)**\n📄 សរុបមាន៖ {total_pages} ទំព័រ"
-            )
+            with open(output_img, "rb") as img_file:
+                await update.message.reply_photo(
+                    photo=img_file,
+                    caption=f"🖼 **PDF Preview (ទំព័រទី ១)**\n📄 សរុបមាន៖ {total_pages} ទំព័រ"
+                )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
     finally:
@@ -169,7 +174,7 @@ async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_img): os.remove(output_img)
 
-# មុខងារ 4: Compress PDF
+# មុខងារ 4: Compress PDF (ជាមួយ Thumbnail Preview)
 async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
@@ -181,7 +186,7 @@ async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     input_pdf = f"comp_in_{user_id}.pdf"
     output_pdf = f"comp_out_{user_id}.pdf"
-    thumb_img = f"comp_thumb_{user_id}.jpg"
+    thumb_path = f"comp_thumb_{user_id}.jpg"
 
     await pdf_file.download_to_drive(input_pdf)
     try:
@@ -194,26 +199,28 @@ async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with open(output_pdf, "wb") as f:
             writer.write(f)
 
-        has_thumb = make_telegram_thumbnail(output_pdf, thumb_img)
-        if has_thumb and os.path.exists(thumb_img):
-            with open(thumb_img, "rb") as thumb_file:
+        has_thumb = generate_pdf_thumbnail(output_pdf, thumb_path)
+        
+        if has_thumb and os.path.exists(thumb_path):
+            with open(output_pdf, "rb") as pdf_file_out, open(thumb_path, "rb") as thumb_file:
                 await update.message.reply_document(
-                    document=open(output_pdf, "rb"),
+                    document=pdf_file_out,
                     thumbnail=thumb_file,
                     caption="✅ កាត់បន្ថយទំហំ PDF ជោគជ័យ!"
                 )
         else:
-            await update.message.reply_document(
-                document=open(output_pdf, "rb"),
-                caption="✅ កាត់បន្ថយទំហំ PDF ជោគជ័យ!"
-            )
+            with open(output_pdf, "rb") as pdf_file_out:
+                await update.message.reply_document(
+                    document=pdf_file_out,
+                    caption="✅ កាត់បន្ថយទំហំ PDF ជោគជ័យ!"
+                )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
     finally:
         await status_msg.delete()
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_pdf): os.remove(output_pdf)
-        if os.path.exists(thumb_img): os.remove(thumb_img)
+        if os.path.exists(thumb_path): os.remove(thumb_path)
 
 # មុខងារ 5: Generate QR Code
 async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -228,7 +235,8 @@ async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         img = qrcode.make(text)
         img.save(qr_img)
-        await update.message.reply_photo(photo=open(qr_img, "rb"), caption=f"✅ QR Code សម្រាប់៖ {text}")
+        with open(qr_img, "rb") as photo_file:
+            await update.message.reply_photo(photo=photo_file, caption=f"✅ QR Code សម្រាប់៖ {text}")
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
     finally:
