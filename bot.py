@@ -2,8 +2,8 @@ import os
 import logging
 from threading import Thread
 from flask import Flask
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 import img2pdf
 from pdf2docx import Converter
 import qrcode
@@ -11,7 +11,6 @@ from pypdf import PdfReader, PdfWriter
 import fitz  # PyMuPDF
 from PIL import Image
 
-# Library សម្រាប់ Excel to PDF ដើរ 100% លើ Server
 import openpyxl
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
@@ -36,7 +35,7 @@ logging.basicConfig(
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# Function បង្កើត PDF Thumbnail គុណភាព Ultra HD
+# Function បង្កើត PDF Thumbnail
 def generate_pdf_thumbnail(pdf_path, output_thumb_path):
     try:
         doc = fitz.open(pdf_path)
@@ -73,25 +72,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "4. ផ្ញើ **File PDF** រួច Reply `/preview` ➔ មើលរូបភាព Preview\n"
         "5. ផ្ញើ **File PDF** រួច Reply `/compress` ➔ កាត់បន្ថយទំហំ PDF\n"
         "6. `/qr <អត្ថបទ/Link>` ➔ បង្កើត QR Code\n\n"
-        "📚 **មុខងាររៀនភាសាអង់គ្លេស៖**\n"
-        "• `/english` - បើកម៉ឺនុយរៀនភាសាអង់គ្លេស\n"
+        "📚 **មជ្ឈមណ្ឌលរៀនភាសាអង់គ្លេស (English Learning Center)៖**\n"
+        "• `/english` - បើកម៉ឺនុយរៀនភាសាអង់គ្លេស (Interactive Menu)\n"
         "• `/vocab` - រៀនពាក្យគន្លឹះប្រចាំថ្ងៃ\n"
         "• `/grammar` - រៀនទម្រង់វេយ្យាករណ៍\n"
+        "• `/idiom` - រៀនពាក្យប្រៀបធៀប (Idioms)\n"
         "• `/quiz` - ធ្វើលំហាត់តេស្តសមត្ថភាព\n"
     )
     await update.message.reply_text(msg)
 
-# --- មុខងាររៀន English ---
+# --- 🎓 មុខងាររៀន English (Advanced & Interactive) ---
 
 async def english_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [
+            InlineKeyboardButton("📖 Vocabulary", callback_data="eng_vocab"),
+            InlineKeyboardButton("✍️ Grammar Tips", callback_data="eng_grammar")
+        ],
+        [
+            InlineKeyboardButton("💡 Idioms", callback_data="eng_idiom"),
+            InlineKeyboardButton("❓ Quiz Time", callback_data="eng_quiz")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     msg = (
         "📚 **មជ្ឈមណ្ឌលរៀនភាសាអង់គ្លេស (English Learning Center)** 🇬🇧\n\n"
-        "សូមជ្រើសរើសបញ្ជាខាងក្រោមដើម្បីរៀន៖\n"
-        "👉 `/vocab` - រៀនពាក្យគន្លឹះប្រចាំថ្ងៃ (Daily Vocabulary)\n"
-        "👉 `/grammar` - រៀនទ្រឹស្តីវេយ្យាករណ៍ (Grammar Tips)\n"
-        "👉 `/quiz` - ធ្វើលំហាត់តេស្តសមត្ថភាព (English Quiz)\n"
+        "សូមជ្រើសរើសផ្នែកដែលអ្នកចង់សិក្សាខាងក្រោម៖"
     )
-    await update.message.reply_text(msg)
+    
+    if update.message:
+        await update.message.reply_text(msg, reply_markup=reply_markup)
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(msg, reply_markup=reply_markup)
 
 async def english_vocab(update: Update, context: ContextTypes.DEFAULT_TYPE):
     vocab_msg = (
@@ -105,7 +118,10 @@ async def english_vocab(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• She achieved high marks in her exams.\n"
         "  (នាងទទួលបានពិន្ទុខ្ពស់ក្នុងការប្រឡង។)"
     )
-    await update.message.reply_text(vocab_msg)
+    if update.callback_query:
+        await update.callback_query.message.reply_text(vocab_msg)
+    else:
+        await update.message.reply_text(vocab_msg)
 
 async def english_grammar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     grammar_msg = (
@@ -117,24 +133,67 @@ async def english_grammar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👉 Form: Subject + am/is/are + V-ing\n"
         "• I am playing football right now. (ខ្ញុំកំពុងតែលេងបាល់ឥឡូវនេះ)"
     )
-    await update.message.reply_text(grammar_msg)
+    if update.callback_query:
+        await update.callback_query.message.reply_text(grammar_msg)
+    else:
+        await update.message.reply_text(grammar_msg)
+
+async def english_idiom(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    idiom_msg = (
+        "💡 **Idiom of the Day (សភាសិត/ពាក្យប្រៀបធៀប)**\n\n"
+        "🗣 **Idiom:** Piece of cake\n"
+        "🇰🇭 **Meaning:** ងាយស្រួលខ្លាំងណាស់ (Very easy)\n\n"
+        "📝 **Example:**\n"
+        "• Don't worry about the English test, it's a piece of cake!\n"
+        "  (កុំបារម្ភអីពីរឿងប្រឡងអង់គ្លេស វាងាយស្រួលខ្លាំងណាស់!)"
+    )
+    if update.callback_query:
+        await update.callback_query.message.reply_text(idiom_msg)
+    else:
+        await update.message.reply_text(idiom_msg)
 
 async def english_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("A) go", callback_data="quiz_wrong"), InlineKeyboardButton("B) goes", callback_data="quiz_correct")],
+        [InlineKeyboardButton("C) going", callback_data="quiz_wrong"), InlineKeyboardButton("D) is go", callback_data="quiz_wrong")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     quiz_msg = (
         "❓ **English Quiz Time!**\n\n"
         "ចូរជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ៖\n"
-        "\"She _______ to school every day.\"\n\n"
-        "A) go\n"
-        "B) goes\n"
-        "C) going\n"
-        "D) is go\n\n"
-        "💡 *ចម្លើយត្រឹមត្រូវគឺ៖ B) goes (ព្រោះជាទម្លាប់ប្រចាំថ្ងៃ ប្រើ Present Simple ជាមួយ Subject 'She')*"
+        "\"She _______ to school every day.\""
     )
-    await update.message.reply_text(quiz_msg)
+    
+    if update.callback_query:
+        await update.callback_query.message.reply_text(quiz_msg, reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(quiz_msg, reply_markup=reply_markup)
+
+# Callback Handler សម្រាប់ចម្លើយ Quiz និង Buttons
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "eng_vocab":
+        await english_vocab(update, context)
+    elif query.data == "eng_grammar":
+        await english_grammar(update, context)
+    elif query.data == "eng_idiom":
+        await english_idiom(update, context)
+    elif query.data == "eng_quiz":
+        await english_quiz(update, context)
+    elif query.data == "quiz_correct":
+        await query.edit_message_text(
+            f"{query.message.text}\n\n✅ **ត្រឹមត្រូវ! (Correct!)**\n💡 ហេតុផល៖ ព្រោះជាទម្លាប់ប្រចាំថ្ងៃ ប្រើ Present Simple ជាមួយ Subject 'She' (She/He/It + Verb-s/es)។"
+        )
+    elif query.data == "quiz_wrong":
+        await query.edit_message_text(
+            f"{query.message.text}\n\n❌ **មិនត្រឹមត្រូវទេ! (Incorrect)**\n💡 ព្យាយាមម្តងទៀត! ចម្លើយដែលត្រូវគឺ **B) goes** (Present Simple ជាមួយ Subject 'She')។"
+        )
 
 # --- មុខងារ Utility ដើម ---
 
-# 1. Image to PDF
 async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែងរូបភាពទៅជា PDF...")
     photo_file = await update.message.photo[-1].get_file()
@@ -172,7 +231,6 @@ async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
         if os.path.exists(output_pdf): os.remove(output_pdf)
         if os.path.exists(thumb_path): os.remove(thumb_path)
 
-# 2. PDF to Word
 async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែង PDF ទៅជា Word...")
@@ -200,7 +258,6 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
-# 3. Excel to PDF (ប្រើ openpyxl + reportlab)
 async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     if not doc.file_name.endswith(('.xlsx', '.xls')):
@@ -264,7 +321,6 @@ async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
         if os.path.exists(output_pdf): os.remove(output_pdf)
         if os.path.exists(thumb_path): os.remove(thumb_path)
 
-# 4. Preview PDF
 async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
@@ -301,7 +357,6 @@ async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_img): os.remove(output_img)
 
-# 5. Compress PDF
 async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
@@ -349,7 +404,6 @@ async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(output_pdf): os.remove(output_pdf)
         if os.path.exists(thumb_path): os.remove(thumb_path)
 
-# 6. Generate QR Code
 async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = " ".join(context.args)
     if not text:
@@ -377,19 +431,23 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
     
-    # Register Commands
+    # Utility Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("qr", generate_qr))
     app.add_handler(CommandHandler("preview", preview_pdf))
     app.add_handler(CommandHandler("compress", compress_pdf_file))
     
-    # Register English Learning Commands
+    # English Learning Commands
     app.add_handler(CommandHandler("english", english_menu))
     app.add_handler(CommandHandler("vocab", english_vocab))
     app.add_handler(CommandHandler("grammar", english_grammar))
+    app.add_handler(CommandHandler("idiom", english_idiom))
     app.add_handler(CommandHandler("quiz", english_quiz))
+    
+    # Button Callbacks
+    app.add_handler(CallbackQueryHandler(handle_callback))
 
-    # Register File Message Handlers
+    # File Handlers
     app.add_handler(MessageHandler(filters.PHOTO, convert_image_to_pdf))
     app.add_handler(MessageHandler(filters.Document.PDF, convert_pdf_to_word))
     app.add_handler(MessageHandler(filters.Document.FileExtension("xlsx") | filters.Document.FileExtension("xls"), convert_excel_to_pdf))
