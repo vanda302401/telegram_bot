@@ -14,7 +14,8 @@ from PIL import Image
 import openpyxl
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib import colors
+from reportlab.lib import colors  # <--- កែត្រង់នេះ
+
 # --- 1. Web Server សម្រាប់ Render ---
 web_app = Flask(__name__)
 
@@ -72,7 +73,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "5. ផ្ញើ **File PDF** រួច Reply `/compress` ➔ កាត់បន្ថយទំហំ PDF\n"
         "6. `/qr <អត្ថបទ/Link>` ➔ បង្កើត QR Code\n\n"
         "📚 **មជ្ឈមណ្ឌលរៀនភាសាអង់គ្លេស (English Learning Center)៖**\n"
-        "• `/english` - បើកម៉ឺនុយរៀនភាសាអង់គ្លេស (Interactive Menu)\n"
+        "• `/english` - បើកម៉ឺនុយរៀនភាសាអង់គ្លេស\n"
         "• `/vocab` - រៀនពាក្យគន្លឹះប្រចាំថ្ងៃ\n"
         "• `/grammar` - រៀនទម្រង់វេយ្យាករណ៍\n"
         "• `/idiom` - រៀនពាក្យប្រៀបធៀប (Idioms)\n"
@@ -80,7 +81,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
-# --- 🎓 មុខងាររៀន English (Advanced & Interactive) ---
+# --- 🎓 មុខងាររៀន English ---
 
 async def english_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -169,7 +170,6 @@ async def english_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(quiz_msg, reply_markup=reply_markup)
 
-# Callback Handler សម្រាប់ចម្លើយ Quiz និង Buttons
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -184,7 +184,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await english_quiz(update, context)
     elif query.data == "quiz_correct":
         await query.edit_message_text(
-            f"{query.message.text}\n\n✅ **ត្រឹមត្រូវ! (Correct!)**\n💡 ហេតុផល៖ ព្រោះជាទម្លាប់ប្រចាំថ្ងៃ ប្រើ Present Simple ជាមួយ Subject 'She' (She/He/It + Verb-s/es)។"
+            f"{query.message.text}\n\n✅ **ត្រឹមត្រូវ! (Correct!)**\n💡 ហេតុផល៖ ព្រោះជាទម្លាប់ប្រចាំថ្ងៃ ប្រើ Present Simple ជាមួយ Subject 'She' (She/He/It + Verb-s/es) focus លើសកម្មភាពជាទម្លាប់។"
         )
     elif query.data == "quiz_wrong":
         await query.edit_message_text(
