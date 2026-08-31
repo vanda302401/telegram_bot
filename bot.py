@@ -10,7 +10,12 @@ import qrcode
 from pypdf import PdfReader, PdfWriter
 import fitz  # PyMuPDF
 from PIL import Image
-import aspose.cells as cells
+
+# Library សម្រាប់ Excel to PDF ដើរ 100% លើ Server
+import openpyxl
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab import colors
 
 # --- 1. Web Server សម្រាប់ Render ---
 web_app = Flask(__name__)
@@ -195,11 +200,11 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
-# 3. Excel to PDF
+# 3. Excel to PDF (ប្រើ openpyxl + reportlab)
 async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
-    if not (doc.file_name.endswith('.xlsx') or doc.file_name.endswith('.xls')):
-        await update.message.reply_text("⚠️ សូមផ្ញើតែ File Excel (.xlsx ឬ .xls) ប៉ុណ្ណោះ!")
+    if not doc.file_name.endswith(('.xlsx', '.xls')):
+        await update.message.reply_text("⚠️ សូមផ្ញើតែ File Excel (.xlsx) ប៉ុណ្ណោះ!")
         return
 
     status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែង Excel ទៅជា PDF...")
@@ -212,29 +217,45 @@ async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await excel_file.download_to_drive(input_excel)
     try:
-        workbook = cells.Workbook(input_excel)
-        save_options = cells.PdfSaveOptions()
-        save_options.set_one_page_per_sheet(False)
-        workbook.save(output_pdf, save_options)
+        wb = openpyxl.load_workbook(input_excel, data_only=True)
+        sheet = wb.active
+        
+        data = []
+        for row in sheet.iter_rows(values_only=True):
+            row_data = [str(cell) if cell is not None else "" for cell in row]
+            if any(row_data):
+                data.append(row_data)
 
-        if os.path.exists(output_pdf):
-            has_thumb = generate_pdf_thumbnail(output_pdf, thumb_path)
-            if has_thumb and os.path.exists(thumb_path):
-                with open(output_pdf, "rb") as pdf_file, open(thumb_path, "rb") as thumb_file:
-                    await update.message.reply_document(
-                        document=pdf_file,
-                        thumbnail=thumb_file,
-                        caption="✅ បំប្លែង Excel ទៅជា PDF ជោគជ័យ!"
-                    )
-            else:
-                with open(output_pdf, "rb") as pdf_file:
-                    await update.message.reply_document(
-                        document=pdf_file,
-                        caption="✅ បំប្លែង Excel ទៅជា PDF ជោគជ័យ!"
-                    )
+        if not data:
+            await update.message.reply_text("❌ File Excel នេះគ្មានទិន្នន័យទេ!")
+            return
+
+        doc_pdf = SimpleDocTemplate(output_pdf, pagesize=letter)
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        doc_pdf.build([table])
+
+        has_thumb = generate_pdf_thumbnail(output_pdf, thumb_path)
+        if has_thumb and os.path.exists(thumb_path):
+            with open(output_pdf, "rb") as pdf_file, open(thumb_path, "rb") as thumb_file:
+                await update.message.reply_document(
+                    document=pdf_file,
+                    thumbnail=thumb_file,
+                    caption="✅ បំប្លែង Excel ទៅជា PDF ជោគជ័យ!"
+                )
         else:
-            await update.message.reply_text("❌ បរាជ័យក្នុងការបំប្លែង File!")
-
+            with open(output_pdf, "rb") as pdf_file:
+                await update.message.reply_document(
+                    document=pdf_file,
+                    caption="✅ បំប្លែង Excel ទៅជា PDF ជោគជ័យ!"
+                )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
     finally:
