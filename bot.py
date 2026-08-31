@@ -56,20 +56,80 @@ def generate_pdf_thumbnail(pdf_path, output_thumb_path):
         print(f"Thumbnail Generation Error: {e}")
     return False
 
+# --- 3. Command Handlers ---
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
-        "សូមស្វាគមន៍មកកាន់ Ultimate File & Utility Bot! 🤖📄\n\n"
-        "🛠 **មុខងារដែលមាន៖**\n"
+        "សូមស្វាគមន៍មកកាន់ Ultimate File Utility & Learning Bot! 🤖📄🇬🇧\n\n"
+        "🛠 **មុខងារគ្រប់គ្រង File៖**\n"
         "1. ផ្ញើ **រូបភាព (JPG/PNG)** ➔ បំប្លែងទៅ **PDF**\n"
         "2. ផ្ញើ **File PDF** ➔ បំប្លែងទៅ **Word (.docx)**\n"
-        "3. ផ្ញើ **File Excel (.xlsx / .xls)** ➔ បំប្លែងទៅ **PDF** (ភ្ជាប់ Thumbnail)\n"
-        "4. ផ្ញើ **File PDF** រួច Reply វាយ `/preview` ➔ ផ្ញើរូបភាព Full Preview\n"
-        "5. ផ្ញើ **File PDF** រួច Reply វាយ `/compress` ➔ កាត់បន្ថយទំហំ PDF\n"
-        "6. វាយបញ្ជា `/qr <អត្ថបទ/Link>` ➔ បង្កើត QR Code\n"
+        "3. ផ្ញើ **File Excel (.xlsx / .xls)** ➔ បំប្លែងទៅ **PDF**\n"
+        "4. ផ្ញើ **File PDF** រួច Reply `/preview` ➔ មើលរូបភាព Preview\n"
+        "5. ផ្ញើ **File PDF** រួច Reply `/compress` ➔ កាត់បន្ថយទំហំ PDF\n"
+        "6. `/qr <អត្ថបទ/Link>` ➔ បង្កើត QR Code\n\n"
+        "📚 **មុខងាររៀនភាសាអង់គ្លេស៖**\n"
+        "• `/english` - បើកម៉ឺនុយរៀនភាសាអង់គ្លេស\n"
+        "• `/vocab` - រៀនពាក្យគន្លឹះប្រចាំថ្ងៃ\n"
+        "• `/grammar` - រៀនទម្រង់វេយ្យាករណ៍\n"
+        "• `/quiz` - ធ្វើលំហាត់តេស្តសមត្ថភាព\n"
     )
     await update.message.reply_text(msg)
 
-# មុខងារ 1: Image to PDF
+# --- មុខងាររៀន English ---
+
+async def english_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "📚 **មជ្ឈមណ្ឌលរៀនភាសាអង់គ្លេស (English Learning Center)** 🇬🇧\n\n"
+        "សូមជ្រើសរើសបញ្ជាខាងក្រោមដើម្បីរៀន៖\n"
+        "👉 `/vocab` - រៀនពាក្យគន្លឹះប្រចាំថ្ងៃ (Daily Vocabulary)\n"
+        "👉 `/grammar` - រៀនទ្រឹស្តីវេយ្យាករណ៍ (Grammar Tips)\n"
+        "👉 `/quiz` - ធ្វើលំហាត់តេស្តសមត្ថភាព (English Quiz)\n"
+    )
+    await update.message.reply_text(msg)
+
+async def english_vocab(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    vocab_msg = (
+        "💡 **Word of the Day (ពាក្យប្រចាំថ្ងៃ)**\n\n"
+        "📖 **Word:** Achieve /əˈtʃiːv/\n"
+        "🔊 **Type:** Verb (កិរិយាសព្ទ)\n"
+        "🇰🇭 **Meaning:** សម្រេចបាន, ទទួលបានជោគជ័យ\n\n"
+        "📝 **Example Sentences:**\n"
+        "• You can achieve your goals if you work hard.\n"
+        "  (អ្នកអាចសម្រេចគោលដៅរបស់អ្នកបាន ប្រសិនបើអ្នកខិតខំប្រឹងប្រែង។)\n"
+        "• She achieved high marks in her exams.\n"
+        "  (នាងទទួលបានពិន្ទុខ្ពស់ក្នុងការប្រឡង។)"
+    )
+    await update.message.reply_text(vocab_msg)
+
+async def english_grammar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    grammar_msg = (
+        "📖 **Grammar Tip: Present Simple vs Present Continuous**\n\n"
+        "1️⃣ **Present Simple** (ទម្លាប់/ការពិតទូទៅ)៖\n"
+        "👉 Form: Subject + Verb(s/es)\n"
+        "• I play football every Sunday. (ខ្ញុំលេងបាល់រាល់ថ្ងៃអាទិត្យ)\n\n"
+        "2️⃣ **Present Continuous** (សកម្មភាពកំពុងធ្វើភ្លាមៗ)៖\n"
+        "👉 Form: Subject + am/is/are + V-ing\n"
+        "• I am playing football right now. (ខ្ញុំកំពុងតែលេងបាល់ឥឡូវនេះ)"
+    )
+    await update.message.reply_text(grammar_msg)
+
+async def english_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    quiz_msg = (
+        "❓ **English Quiz Time!**\n\n"
+        "ចូរជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ៖\n"
+        "\"She _______ to school every day.\"\n\n"
+        "A) go\n"
+        "B) goes\n"
+        "C) going\n"
+        "D) is go\n\n"
+        "💡 *ចម្លើយត្រឹមត្រូវគឺ៖ B) goes (ព្រោះជាទម្លាប់ប្រចាំថ្ងៃ ប្រើ Present Simple ជាមួយ Subject 'She')*"
+    )
+    await update.message.reply_text(quiz_msg)
+
+# --- មុខងារ Utility ដើម ---
+
+# 1. Image to PDF
 async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែងរូបភាពទៅជា PDF...")
     photo_file = await update.message.photo[-1].get_file()
@@ -107,7 +167,7 @@ async def convert_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
         if os.path.exists(output_pdf): os.remove(output_pdf)
         if os.path.exists(thumb_path): os.remove(thumb_path)
 
-# មុខងារ 2: PDF to Word
+# 2. PDF to Word
 async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     status_msg = await update.message.reply_text("⏳ កំពុងបំប្លែង PDF ទៅជា Word...")
@@ -135,7 +195,7 @@ async def convert_pdf_to_word(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_docx): os.remove(output_docx)
 
-# មុខងារ 3: Excel to PDF (Pure Python Solution ដោយប្រើ Aspose.Cells)
+# 3. Excel to PDF
 async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     if not (doc.file_name.endswith('.xlsx') or doc.file_name.endswith('.xls')):
@@ -152,7 +212,6 @@ async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await excel_file.download_to_drive(input_excel)
     try:
-        # បំប្លែង Excel ទៅជា PDF
         workbook = cells.Workbook(input_excel)
         save_options = cells.PdfSaveOptions()
         save_options.set_one_page_per_sheet(False)
@@ -184,7 +243,7 @@ async def convert_excel_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYP
         if os.path.exists(output_pdf): os.remove(output_pdf)
         if os.path.exists(thumb_path): os.remove(thumb_path)
 
-# មុខងារ 4: Preview PDF
+# 4. Preview PDF
 async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
@@ -221,7 +280,7 @@ async def preview_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(input_pdf): os.remove(input_pdf)
         if os.path.exists(output_img): os.remove(output_img)
 
-# មុខងារ 5: Compress PDF
+# 5. Compress PDF
 async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = update.message.reply_to_message
     if not reply or not reply.document or not reply.document.file_name.endswith('.pdf'):
@@ -269,7 +328,7 @@ async def compress_pdf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(output_pdf): os.remove(output_pdf)
         if os.path.exists(thumb_path): os.remove(thumb_path)
 
-# មុខងារ 6: Generate QR Code
+# 6. Generate QR Code
 async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = " ".join(context.args)
     if not text:
@@ -290,17 +349,27 @@ async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_msg.delete()
         if os.path.exists(qr_img): os.remove(qr_img)
 
+# --- 4. Main Function ---
+
 def main():
     Thread(target=run_web).start()
 
     app = Application.builder().token(TOKEN).build()
+    
+    # Register Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("qr", generate_qr))
     app.add_handler(CommandHandler("preview", preview_pdf))
     app.add_handler(CommandHandler("compress", compress_pdf_file))
-    app.add_handler(MessageHandler(filters.PHOTO, convert_image_to_pdf))
     
-    # ស្កែន Document File ( PDF ឬ Excel )
+    # Register English Learning Commands
+    app.add_handler(CommandHandler("english", english_menu))
+    app.add_handler(CommandHandler("vocab", english_vocab))
+    app.add_handler(CommandHandler("grammar", english_grammar))
+    app.add_handler(CommandHandler("quiz", english_quiz))
+
+    # Register File Message Handlers
+    app.add_handler(MessageHandler(filters.PHOTO, convert_image_to_pdf))
     app.add_handler(MessageHandler(filters.Document.PDF, convert_pdf_to_word))
     app.add_handler(MessageHandler(filters.Document.FileExtension("xlsx") | filters.Document.FileExtension("xls"), convert_excel_to_pdf))
 
