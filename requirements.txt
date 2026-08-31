@@ -6,4 +6,5 @@ qrcode
 pypdf
 PyMuPDF
 Pillow
-aspose-cells-python
+openpyxl
+reportlab
