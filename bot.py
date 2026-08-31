@@ -14,8 +14,7 @@ from PIL import Image
 import openpyxl
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab import colors
-
+from reportlab.lib import colors
 # --- 1. Web Server សម្រាប់ Render ---
 web_app = Flask(__name__)
 
